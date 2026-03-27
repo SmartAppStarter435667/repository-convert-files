@@ -82,10 +82,6 @@ button:active {
   opacity: 0.7;
 }
 
-.loader {
-  margin-top: 10px;
-}
-
 @media (min-width: 768px) {
   .container {
     max-width: 800px;
@@ -102,6 +98,9 @@ button:active {
 <input id="username" placeholder="GitHub Username">
 <input id="token" placeholder="Token（任意）">
 
+<!-- ★ 追加：フィルタ -->
+<input id="filter" placeholder="フィルタ（例: ai, machine learning）">
+
 <button onclick="fetchStars()">スター取得</button>
 <button onclick="download()">ダウンロード</button>
 
@@ -114,6 +113,28 @@ button:active {
 
 <script>
 let repos = [];
+
+// ★ フィルタ関数
+function filterRepos() {
+  const keyword = document.getElementById("filter").value.toLowerCase().trim();
+
+  if (!keyword) return repos;
+
+  return repos.filter(r => {
+    const text = [
+      r.name,
+      r.full_name,
+      r.description,
+      r.language,
+      ...(r.topics || [])
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return text.includes(keyword);
+  });
+}
 
 async function fetchStars() {
   const username = document.getElementById("username").value.trim();
@@ -136,7 +157,10 @@ async function fetchStars() {
       const res = await fetch(
         `https://api.github.com/users/${username}/starred?per_page=100&page=${page}`,
         {
-          headers: token ? { Authorization: "token " + token } : {}
+          headers: {
+            Accept: "application/vnd.github.mercy-preview+json",
+            ...(token ? { Authorization: "token " + token } : {})
+          }
         }
       );
 
@@ -152,23 +176,26 @@ async function fetchStars() {
       }
 
       repos.push(...data);
-      renderChunk(data);
 
       updateStatus(`取得中... ${repos.length}件`);
       page++;
     }
 
-    document.getElementById("count").innerText = repos.length;
+    renderFiltered();
     updateStatus("完了");
   } catch (e) {
     updateStatus("エラー: " + e.message);
   }
 }
 
-function renderChunk(chunk) {
+// ★ フィルタ後の描画
+function renderFiltered() {
   const list = document.getElementById("list");
+  list.innerHTML = "";
 
-  chunk.forEach(r => {
+  const filtered = filterRepos();
+
+  filtered.forEach(r => {
     const div = document.createElement("div");
     div.className = "card";
 
@@ -181,22 +208,32 @@ function renderChunk(chunk) {
 
     list.appendChild(div);
   });
+
+  document.getElementById("count").innerText = filtered.length;
 }
 
 function updateStatus(msg) {
   document.getElementById("status").innerText = msg;
 }
 
+// ★ フィルタ変更時に即反映
+document.getElementById("filter").addEventListener("input", () => {
+  renderFiltered();
+});
+
+// ★ ダウンロードもフィルタ適用
 function download() {
-  const urls = repos.map(r => r.html_url).join("\n");
+  const filtered = filterRepos();
+  const urls = filtered.map(r => r.html_url).join("\n");
+
   const blob = new Blob([urls], { type: "text/plain" });
 
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "stars.txt";
+  a.download = "filtered_stars.txt";
   a.click();
 }
 </script>
 
 </body>
-  </html>
+</html>
