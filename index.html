@@ -2,79 +2,45 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GitHub Star Manager</title>
+<title>Star List Manager</title>
 
 <style>
 body { font-family: sans-serif; padding: 20px; }
-
-button, input {
-  width: 100%;
-  padding: 10px;
-  margin: 5px 0;
-}
-
-.section {
-  margin-top: 20px;
-}
-
-.repo {
-  border-bottom: 1px solid #eee;
-  padding: 5px;
-}
-
-.list-group {
-  border: 1px solid #ccc;
-  margin-top: 10px;
-  padding: 10px;
-}
+input, button { width: 100%; padding: 10px; margin: 5px 0; }
+.repo { border-bottom: 1px solid #eee; padding: 5px; }
+.list-box { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
 </style>
 </head>
 <body>
 
-<h2>GitHub スター管理</h2>
+<h2>スター + カスタムリスト</h2>
 
 <input id="username" placeholder="username">
-<input id="token" placeholder="token（任意）">
+<button onclick="fetchStars()">スター取得</button>
 
-<button onclick="fetchStars()">①スター取得</button>
-<button onclick="buildLists()">②リスト生成</button>
+<h3>リスト作成</h3>
+<input id="listName" placeholder="リスト名">
+<input id="keyword" placeholder="フィルタ（例: react, ai）">
+<button onclick="createList()">リスト作成</button>
 
-<div class="section">
-  総数: <span id="count">0</span>
-</div>
+<div>総数: <span id="count">0</span></div>
 
-<div class="section">
-  <h3>URL一覧</h3>
-  <textarea id="urls" style="height:150px;"></textarea>
-</div>
-
-<div class="section">
-  <h3>スター一覧</h3>
-  <div id="rawList"></div>
-</div>
-
-<div class="section">
-  <h3>分類リスト（言語別）</h3>
-  <div id="langList"></div>
-</div>
+<h3>リスト一覧</h3>
+<div id="lists"></div>
 
 <script>
 let allRepos = [];
+let lists = {};
 
 async function fetchStars() {
   const username = document.getElementById("username").value;
-  const token = document.getElementById("token").value;
 
   let page = 1;
   allRepos = [];
 
   while (true) {
     const res = await fetch(
-      `https://api.github.com/users/${username}/starred?per_page=100&page=${page}`,
-      {
-        headers: token ? { Authorization: "token " + token } : {}
-      }
+      `https://api.github.com/users/${username}/starred?per_page=100&page=${page}`
     );
 
     const data = await res.json();
@@ -84,59 +50,42 @@ async function fetchStars() {
     page++;
   }
 
-  renderRaw();
-  renderUrls();
-
   document.getElementById("count").innerText = allRepos.length;
 }
 
-function renderRaw() {
-  const el = document.getElementById("rawList");
-  el.innerHTML = "";
+function createList() {
+  const name = document.getElementById("listName").value;
+  const keyword = document.getElementById("keyword").value.toLowerCase();
 
-  allRepos.forEach(r => {
-    el.innerHTML += `
-      <div class="repo">
-        <a href="${r.html_url}" target="_blank">${r.full_name}</a>
-        ⭐${r.stargazers_count}
-      </div>
-    `;
-  });
+  const filtered = allRepos.filter(r =>
+    r.full_name.toLowerCase().includes(keyword) ||
+    (r.description || "").toLowerCase().includes(keyword)
+  );
+
+  lists[name] = filtered;
+
+  renderLists();
 }
 
-function renderUrls() {
-  const urls = allRepos.map(r => r.html_url);
-  document.getElementById("urls").value = urls.join("\n");
-}
-
-function buildLists() {
-  const map = {};
-
-  allRepos.forEach(r => {
-    const lang = r.language || "Other";
-
-    if (!map[lang]) map[lang] = [];
-    map[lang].push(r);
-  });
-
-  const el = document.getElementById("langList");
+function renderLists() {
+  const el = document.getElementById("lists");
   el.innerHTML = "";
 
-  Object.keys(map).forEach(lang => {
-    const group = document.createElement("div");
-    group.className = "list-group";
+  Object.keys(lists).forEach(name => {
+    const box = document.createElement("div");
+    box.className = "list-box";
 
-    group.innerHTML = `<h4>${lang} (${map[lang].length})</h4>`;
+    box.innerHTML = `<h4>${name} (${lists[name].length})</h4>`;
 
-    map[lang].forEach(r => {
-      group.innerHTML += `
+    lists[name].forEach(r => {
+      box.innerHTML += `
         <div class="repo">
           <a href="${r.html_url}" target="_blank">${r.full_name}</a>
         </div>
       `;
     });
 
-    el.appendChild(group);
+    el.appendChild(box);
   });
 }
 </script>
