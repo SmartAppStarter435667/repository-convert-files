@@ -1,37 +1,73 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GitHub Star Exporter</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    input, button { padding: 10px; margin: 5px 0; width: 100%; }
-    textarea { width: 100%; height: 200px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Star Manager</title>
+
+<style>
+body { font-family: sans-serif; padding: 20px; }
+
+button, input {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+}
+
+.section {
+  margin-top: 20px;
+}
+
+.repo {
+  border-bottom: 1px solid #eee;
+  padding: 5px;
+}
+
+.list-group {
+  border: 1px solid #ccc;
+  margin-top: 10px;
+  padding: 10px;
+}
+</style>
 </head>
 <body>
 
-<h2>GitHub スター付きリポジトリURL抽出</h2>
+<h2>GitHub スター管理</h2>
 
-<label>GitHub Username</label>
-<input id="username" placeholder="例: torvalds" />
+<input id="username" placeholder="username">
+<input id="token" placeholder="token（任意）">
 
-<label>Personal Access Token（任意）</label>
-<input id="token" placeholder="API制限回避用" />
+<button onclick="fetchStars()">①スター取得</button>
+<button onclick="buildLists()">②リスト生成</button>
 
-<button onclick="fetchStars()">取得</button>
-<button onclick="downloadFile()">ダウンロード</button>
+<div class="section">
+  総数: <span id="count">0</span>
+</div>
 
-<textarea id="output" placeholder="ここにURL一覧が表示されます"></textarea>
+<div class="section">
+  <h3>URL一覧</h3>
+  <textarea id="urls" style="height:150px;"></textarea>
+</div>
+
+<div class="section">
+  <h3>スター一覧</h3>
+  <div id="rawList"></div>
+</div>
+
+<div class="section">
+  <h3>分類リスト（言語別）</h3>
+  <div id="langList"></div>
+</div>
 
 <script>
+let allRepos = [];
+
 async function fetchStars() {
   const username = document.getElementById("username").value;
   const token = document.getElementById("token").value;
 
   let page = 1;
-  let urls = [];
+  allRepos = [];
 
   while (true) {
     const res = await fetch(
@@ -44,26 +80,66 @@ async function fetchStars() {
     const data = await res.json();
     if (!data.length) break;
 
-    data.forEach(repo => {
-      urls.push(repo.html_url);
-    });
-
+    allRepos = allRepos.concat(data);
     page++;
   }
 
-  document.getElementById("output").value = urls.join("\n");
+  renderRaw();
+  renderUrls();
+
+  document.getElementById("count").innerText = allRepos.length;
 }
 
-function downloadFile() {
-  const content = document.getElementById("output").value;
-  const blob = new Blob([content], { type: "text/plain" });
+function renderRaw() {
+  const el = document.getElementById("rawList");
+  el.innerHTML = "";
 
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "github_stars.txt";
-  a.click();
+  allRepos.forEach(r => {
+    el.innerHTML += `
+      <div class="repo">
+        <a href="${r.html_url}" target="_blank">${r.full_name}</a>
+        ⭐${r.stargazers_count}
+      </div>
+    `;
+  });
+}
+
+function renderUrls() {
+  const urls = allRepos.map(r => r.html_url);
+  document.getElementById("urls").value = urls.join("\n");
+}
+
+function buildLists() {
+  const map = {};
+
+  allRepos.forEach(r => {
+    const lang = r.language || "Other";
+
+    if (!map[lang]) map[lang] = [];
+    map[lang].push(r);
+  });
+
+  const el = document.getElementById("langList");
+  el.innerHTML = "";
+
+  Object.keys(map).forEach(lang => {
+    const group = document.createElement("div");
+    group.className = "list-group";
+
+    group.innerHTML = `<h4>${lang} (${map[lang].length})</h4>`;
+
+    map[lang].forEach(r => {
+      group.innerHTML += `
+        <div class="repo">
+          <a href="${r.html_url}" target="_blank">${r.full_name}</a>
+        </div>
+      `;
+    });
+
+    el.appendChild(group);
+  });
 }
 </script>
 
 </body>
-  </html>
+</html>
